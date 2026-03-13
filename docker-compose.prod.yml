@@ -1,0 +1,87 @@
+services:
+  # OpenClaw Gateway - 生产环境配置
+  openclaw-gateway:
+    image: ${OPENCLAW_IMAGE:-openclaw:local}
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      NODE_ENV: production
+      # 配置路径指向持久化存储
+      OPENCLAW_STATE_DIR: /home/node/.openclaw
+      OPENCLAW_CONFIG_PATH: /home/node/.openclaw/config/openclaw.json
+      # Control UI 配置（避免重启循环）
+      OPENCLAW_CONTROL_UI_DANGEROUSLY_ALLOW_HOST_HEADER_ORIGIN_FALLBACK: "true"
+    volumes:
+      # 主目录持久化 - 包含 identity、agents、sessions、记忆库等核心数据
+      - ${OPENCLAW_HOME_VOLUME}:/home/node/.openclaw
+      # 配置目录
+      - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw/config
+      # 工作空间
+      - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+      # 技能目录（持久化安装的技能）
+      - ${OPENCLAW_SKILLS_DIR}:/home/node/.openclaw/skills
+      # 日志目录
+      - ${OPENCLAW_LOGS_DIR}:/app/logs
+      # 可选：Docker 套接字用于沙箱功能
+      # - //var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "${OPENCLAW_GATEWAY_PORT}:18789"
+      - "${OPENCLAW_BRIDGE_PORT}:18790"
+    init: true
+    restart: unless-stopped
+    command: ["node", "dist/index.js", "gateway", "--bind", "lan", "--port", "18789", "--allow-unconfigured"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # 安全设置
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    # 资源限制（可选）
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 512M
+
+  # OpenClaw CLI - 管理工具
+  openclaw-cli:
+    image: ${OPENCLAW_IMAGE:-openclaw:local}
+    network_mode: "service:openclaw-gateway"
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      BROWSER: echo
+      NODE_ENV: production
+      OPENCLAW_STATE_DIR: /home/node/.openclaw
+      OPENCLAW_CONFIG_PATH: /home/node/.openclaw/config/openclaw.json
+    volumes:
+      # 主目录持久化
+      - ${OPENCLAW_HOME_VOLUME}:/home/node/.openclaw
+      # 配置目录
+      - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw/config
+      # 工作空间
+      - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+      # 技能目录
+      - ${OPENCLAW_SKILLS_DIR}:/home/node/.openclaw/skills
+      # 日志目录
+      - ${OPENCLAW_LOGS_DIR}:/app/logs
+    stdin_open: true
+    tty: true
+    init: true
+    entrypoint: ["node", "dist/index.js"]
+    depends_on:
+      - openclaw-gateway
