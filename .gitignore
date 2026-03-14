@@ -1,6 +1,7 @@
 node_modules
 **/node_modules/
 .env
+.env.override
 docker-compose.extra.yml
 dist
 pnpm-lock.yaml
@@ -18,6 +19,9 @@ ui/src/ui/__screenshots__/
 ui/playwright-report/
 ui/test-results/
 packages/dashboard-next/.next/
+# Backup files (may contain sensitive credentials)
+*-backup-*
+BACKUP_README.md
 packages/dashboard-next/out/
 
 # Mise configuration files
